@@ -1,7 +1,8 @@
 """
-Questions: 
+Questions:
 - what does borrow=True do in theano.shared?
-- how does T.dot(input, self.W) know how to multiply the matrices? standard matrix multiplication?
+- how does T.dot(input, self.W) know how to multiply the matrices?
+standard matrix multiplication?
 - what does the axes mean for argmax?
 
 This tutorial introduces logistic regression using Theano and stochastic
@@ -354,21 +355,23 @@ def sgd_optimization_mnist(learning_rate=0.13, n_epochs=1000,
     # TRAIN MODEL #
     ###############
 
-    ## Below, the iter counter counts the number of minibatch steps we've
-    ## taken. 
+    # Below, the iter counter counts the number of minibatch steps we've
+    # taken.
 
     print '... training the model'
     # early-stopping parameters
-    patience = 5000  # look as this many examples regardless (I think patience is actually in the units of minibatches)
+    # look as this many examples regardless (I think patience
+    # is actually in the units of minibatches)
+    patience = 5000
     patience_increase = 2  # wait this much longer when a new best is
-                                  # found
+    # found
     improvement_threshold = 0.995  # a relative improvement of this much is
-                                  # considered significant
+    # considered significant
     validation_frequency = min(n_train_batches, patience / 2)
-                                  # go through this many
-                                  # minibatches before checking the network
-                                  # on the validation set; in this case we
-                                  # check every epoch
+    # go through this many
+    # minibatches before checking the network
+    # on the validation set; in this case we
+    # check every epoch
 
     best_validation_loss = numpy.inf
     test_score = 0.
@@ -445,9 +448,14 @@ def sgd_optimization_mnist(learning_rate=0.13, n_epochs=1000,
     )
     print 'The code run for %d epochs, with %f epochs/sec' % (
         epoch, 1. * epoch / (end_time - start_time))
-    print >> sys.stderr, ('The code for file ' +
-                          os.path.split(__file__)[1] +
-                          ' ran for %.1fs' % ((end_time - start_time)))
+    try:
+        print >> sys.stderr, ('The code for file ' +
+                              os.path.split(__file__)[1] +
+                              ' ran for %.1fs' % ((end_time -
+                                                   start_time)))
+    except:
+        print >> sys.stderr, ('The code (run interactively)' +
+                              'ran for %.1fs' % ((end_time - start_time)))
 
 
 def predict():
@@ -465,7 +473,7 @@ def predict():
         outputs=classifier.y_pred)
 
     # We can test it on some examples from test test
-    dataset='mnist.pkl.gz'
+    dataset = 'mnist.pkl.gz'
     datasets = load_data(dataset)
     test_set_x, test_set_y = datasets[2]
     test_set_x = test_set_x.get_value()
@@ -476,5 +484,6 @@ def predict():
 
 
 if __name__ == '__main__':
-    sgd_optimization_mnist(dataset='/Users/drosen/repos/DeepLearningTutorials/data/mnist.pkl.gz')
+    data_path = "/home/drosen/repos/DeepLearningTutorials/data"
+    sgd_optimization_mnist(dataset=os.path.join(data_path, 'mnist.pkl.gz'))
 #   sgd_optimization_mnist(dataset='/Users/drosen/repos/DeepLearningTutorials/data/mnist.small.pkl.gz')

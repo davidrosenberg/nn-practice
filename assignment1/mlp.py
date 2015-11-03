@@ -404,4 +404,5 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
 
 
 if __name__ == '__main__':
-    test_mlp(dataset='~/repos/DeepLearningTutorials/data/mnist.small.pkl')
+    data_path = "/home/drosen/repos/DeepLearningTutorials/data"
+    test_mlp(dataset=os.path.join(data_path, 'mnist.pkl.gz'))
