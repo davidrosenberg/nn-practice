@@ -17,13 +17,14 @@ import theano.tensor as T
 
 from logistic_sgd import LogisticRegression, load_data
 from mlp import HiddenLayer, MLP, test_mlp
- 
+
 
 def relu1(x):
-    return T.switch(x<0, 0, x)
-    
+    return T.switch(x < 0, 0, x)
+
+
 def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
-             dataset='mnist.pkl.gz', batch_size=20, n_hidden=500):
+                dataset='mnist.pkl.gz', batch_size=20, n_hidden=500):
     """
     Demonstrate stochastic gradient descent optimization for a multilayer
     perceptron
@@ -160,7 +161,7 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                                    # considered significant
     validation_frequency = min(n_train_batches, patience / 2)
                                   # go through this many
-                                  # minibatche before checking the network
+                                  # minibatches before checking the network
                                   # on the validation set; in this case we
                                   # check every epoch
 
