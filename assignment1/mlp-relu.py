@@ -80,7 +80,8 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     classifier = MLP(
         rng=rng,
         input=x,
-        n_in=28 * 28,
+#        n_in=28 * 28,
+        n_in=14 * 14,
         n_hidden=n_hidden,
         n_out=10,
         activation=relu1
@@ -231,8 +232,6 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                           os.path.split(__file__)[1] +
                           ' ran for %.2fm' % ((end_time - start_time) / 60.))
 
-
-
-
 if __name__ == '__main__':
-    my_test_mlp(dataset='/Users/drosen/repos/DeepLearningTutorials/data/mnist.pkl.gz')
+    data_path = "/home/drosen/repos/DeepLearningTutorials/data"
+    my_test_mlp(dataset=os.path.join(data_path, 'mnist.small.pkl.gz'))
