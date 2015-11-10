@@ -2,6 +2,8 @@
 from sacred import Experiment
 ex = Experiment('Logistic Regression practice experiment')
 
+from sacred.observers import MongoObserver
+
 import cPickle
 import os
 import sys
@@ -232,11 +234,14 @@ def my_config():
     learning_rate=0.13
     n_epochs=1000,
     data_path = "/home/drosen/repos/DeepLearningTutorials/data"
-    # datasetname = 'mnist.small.pkl.gz'
-    datasetname = 'mnist.pkl.gz'
+    datasetname = 'mnist.small.pkl.gz'
+    #datasetname = 'mnist.pkl.gz'
     dataset = os.path.join(data_path, datasetname)
     batch_size=600
-
+    theano_flags = "mode=FAST_RUN,device=gpu,floatX=float32"
+    os.environ["THEANO_FLAGS"] = theano_flags
+    db_name = "MY_DB"
+    ex.observers.append(MongoObserver.create(db_name=db_name))
 
 @ex.automain
 def my_main():
