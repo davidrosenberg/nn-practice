@@ -1,3 +1,7 @@
+#!/usr/bin/python
+from sacred import Experiment
+ex = Experiment('Logistic Regression practice experiment')
+
 import cPickle
 import os
 import sys
@@ -12,15 +16,16 @@ import data_loader
 import logistic_layer
 
 
+@ex.capture
 def sgd_optimization_mnist(learning_rate=0.13, n_epochs=1000,
                            dataset='mnist.pkl.gz',
                            batch_size=600):
 
     datasets = data_loader.load_data(dataset)
 
-    train_set_x, train_set_y = datasets[0]
-    valid_set_x, valid_set_y = datasets[1]
-    test_set_x, test_set_y = datasets[2]
+    train_set_x, train_set_y = datasets["data"][0]
+    valid_set_x, valid_set_y = datasets["data"][1]
+    test_set_x, test_set_y = datasets["data"][2]
 
     # compute number of minibatches for training, validation and testing
     n_train_batches = train_set_x.get_value(borrow=True).shape[0] / batch_size
@@ -38,8 +43,10 @@ def sgd_optimization_mnist(learning_rate=0.13, n_epochs=1000,
     # construct the logistic regression class
 
     # TODO: extract out the sizes of these things automatically
-    classifier = logistic_layer.LogisticRegression(input=x, n_in=28 * 28,
-                                                   n_out=10)
+
+    classifier = logistic_layer.LogisticRegression(
+        input=x, n_in=datasets["info"]["xdim"],
+        n_out=datasets["info"]["y_num_categories"])
 
     # the cost we minimize during training is the negative log likelihood of
     # the model in symbolic format
@@ -220,7 +227,17 @@ def predict():
     print predicted_values
 
 
-if __name__ == '__main__':
+@ex.config
+def my_config():
+    learning_rate=0.13
+    n_epochs=1000,
     data_path = "/home/drosen/repos/DeepLearningTutorials/data"
-    sgd_optimization_mnist(dataset=os.path.join(data_path, 'mnist.pkl.gz'))
-#   sgd_optimization_mnist(dataset='/Users/drosen/repos/DeepLearningTutorials/data/mnist.small.pkl.gz')
+    # datasetname = 'mnist.small.pkl.gz'
+    datasetname = 'mnist.pkl.gz'
+    dataset = os.path.join(data_path, datasetname)
+    batch_size=600
+
+
+@ex.automain
+def my_main():
+    sgd_optimization_mnist()
