@@ -1,9 +1,8 @@
-"""
-This is me trying to use mlp.py to make a ReLU MLP.
+#!/usr/bin/python
+from sacred import Experiment
+ex = Experiment('MLP practice experiment')
 
-"""
-__docformat__ = 'restructedtext en'
-
+from sacred.observers import MongoObserver
 
 import os
 import sys

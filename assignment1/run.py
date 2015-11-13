@@ -1,24 +1,36 @@
 #!/usr/bin/python
-from sacred import Experiment
-ex = Experiment('Logistic Regression practice experiment')
+import tempfile
+import os
 
+configs = []
+configs.append({"learning_rate": 0.10, "n_epochs": 10})
+configs.append({"learning_rate": 0.15, "n_epochs": 10})
+configs.append({"learning_rate": 0.20, "n_epochs": 10})
+configs.append({"learning_rate": 0.10, "n_epochs": 15})
 
-@ex.config
-def my_config():
-    learning_rate=0.13
-    n_epochs=1000,
-    dataset='mnist.pkl.gz',
-    batch_size=600
+num_gpus = 6
 
-@ex.capture
-def some_function(a, foo, bar=10):
-    print(a, foo, bar)
+base_flags = "THEANO_FLAGS=mode=FAST_RUN,floatX=float32"
+pythonCmd = "python"
+script = "/home/drosen/repos/nn-practice/assignment1/mlp.py"
 
+(f, fname) = tempfile.mkstemp()
 
-@ex.automain
-def my_main():
-    some_function(1, 2, 3)     # 1  2   3
-    some_function(1)           # 1  42  'baz'
-    some_function(1, bar=12)   # 1  42  12
-#    some_function()            # TypeError: missing value for 'a'
-#    print "helllo"
+gpu_num = 0
+for config in configs:
+    if (num_gpus == 1):
+        flags = base_flags + ",device=gpu"
+    else:
+        flags = base_flags + ",device=gpu" + str(gpu_num)
+        gpu_num = (gpu_num + 1) % num_gpus
+    confstr = ' '.join("%s=%s" % (key, val)
+                       for (key, val) in config.iteritems())
+    cmdstr = flags + " " + pythonCmd + " " + script + " with " + confstr + "\n"
+    os.write(f, cmdstr)
+
+os.close(f)
+cmd = "time parallel -a " + fname
+print cmd
+
+# You can then run cmd from the command line, or from Python.
+# Makes use of the GNU Parallel program

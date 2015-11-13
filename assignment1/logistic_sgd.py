@@ -44,8 +44,6 @@ def sgd_optimization_mnist(learning_rate=0.13, n_epochs=1000,
 
     # construct the logistic regression class
 
-    # TODO: extract out the sizes of these things automatically
-
     classifier = logistic_layer.LogisticRegression(
         input=x, n_in=datasets["info"]["xdim"],
         n_out=datasets["info"]["y_num_categories"])
