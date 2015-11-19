@@ -1,9 +1,8 @@
 import numpy
 import theano
 import theano.tensor as T
+import activations as act
 
-def relu1(x):
-    return T.switch(x < 0, 0, x)
 
 
 class HiddenLayer(object):
@@ -46,16 +45,25 @@ class HiddenLayer(object):
         #        We have no info for other function, so we use the same as
         #        tanh.
         if W is None:
-            W_values = numpy.asarray(
-                rng.uniform(
-                    low=-numpy.sqrt(6. / (n_in + n_out)),
-                    high=numpy.sqrt(6. / (n_in + n_out)),
-                    size=(n_in, n_out)
-                ),
-                dtype=theano.config.floatX
-            )
-            if activation == theano.tensor.nnet.sigmoid:
-                W_values *= 4
+            if activation == act.relu1 or activation == act.ReLU:
+                # Following He et al. (Delving Deep Into Rectifiers paper)
+                print "Initializing a ReLU layer"
+                sd = numpy.sqrt(2/float(n_in))
+                W_values = numpy.asarray(
+                    sd * rng.standard_normal(size=(n_in, n_out)),
+                    dtype=theano.config.floatX)
+            else:
+                print "Initializing non-ReLU layer"
+                W_values = numpy.asarray(
+                    rng.uniform(
+                        low=-numpy.sqrt(6. / (n_in + n_out)),
+                        high=numpy.sqrt(6. / (n_in + n_out)),
+                        size=(n_in, n_out)
+                    ),
+                    dtype=theano.config.floatX
+                )
+                if activation == theano.tensor.nnet.sigmoid:
+                    W_values *= 4
 
             W = theano.shared(value=W_values, name='W', borrow=True)
 

@@ -3,10 +3,12 @@ import tempfile
 import os
 
 configs = []
-configs.append({"learning_rate": 0.10, "n_epochs": 10})
-configs.append({"learning_rate": 0.15, "n_epochs": 10})
-configs.append({"learning_rate": 0.20, "n_epochs": 10})
-configs.append({"learning_rate": 0.10, "n_epochs": 15})
+configs.append({"learning_rate": 0.10, "n_epochs": 100})
+configs.append({"learning_rate": 0.15, "n_epochs": 100})
+configs.append({"learning_rate": 0.10, "n_epochs": 100})
+configs.append({"learning_rate": 0.15, "n_epochs": 100})
+configs.append({"learning_rate": 0.20, "n_epochs": 100})
+configs.append({"learning_rate": 0.10, "n_epochs": 100})
 
 num_gpus = 6
 

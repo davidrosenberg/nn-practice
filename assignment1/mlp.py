@@ -17,6 +17,7 @@ import theano.tensor as T
 import data_loader
 from logistic_layer import LogisticRegression
 from hidden_layer import HiddenLayer
+import activations as act
 
 
 class MLP(object):
@@ -30,7 +31,7 @@ class MLP(object):
     class).
     """
 
-    def __init__(self, rng, input, n_in, n_hidden, n_out, activation=T.tanh):
+    def __init__(self, rng, input, n_in, n_hidden, n_out, activations="tanh"):
         """Initialize the parameters for the multilayer perceptron
 
         :type rng: numpy.random.RandomState
@@ -57,6 +58,7 @@ class MLP(object):
         # into a HiddenLayer with a tanh activation function connected to the
         # LogisticRegression layer; the activation function can be replaced by
         # sigmoid or any other nonlinear function
+        activation = act.get_activation(activations)
         self.hiddenLayer = HiddenLayer(rng=rng, input=input, n_in=n_in,
                                        n_out=n_hidden, activation=activation)
 
@@ -90,6 +92,7 @@ class MLP(object):
 @ex.capture
 def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
              dataset='mnist.pkl.gz', batch_size=20, n_hidden=500,
+             activation="tanh",
              rng=numpy.random.RandomState(1234)):
 
     datasets = data_loader.load_data(dataset)
@@ -117,7 +120,8 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     # construct the MLP class
     classifier = MLP(rng=rng, input=x, n_in=datasets["info"]["xdim"],
                      n_hidden=n_hidden,
-                     n_out=datasets["info"]["y_num_categories"])
+                     n_out=datasets["info"]["y_num_categories"],
+                     activations=activation)
 
     cost = (
         classifier.negative_log_likelihood(y)
@@ -243,6 +247,11 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                 break
 
     end_time = timeit.default_timer()
+
+    # Store experiment information
+    ex.info["run_time"] = end_time - start_time
+    ex.info["validation_perf"] = best_validation_loss * 100
+    ex.info["num_epochs"] = epoch
     print(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
@@ -256,7 +265,7 @@ def my_config():
     datasetname = 'mnist.small.pkl.gz'
     #datasetname = 'mnist.pkl.gz'
     dataset = os.path.join(data_path, datasetname)
-    batch_size = 20
+    batch_size = 0
     n_hidden = 500
     theano_flags = "mode=FAST_RUN,device=gpu,floatX=float32"
     os.environ["THEANO_FLAGS"] = theano_flags
@@ -264,7 +273,7 @@ def my_config():
     ex.observers.append(MongoObserver.create(db_name=db_name))
     random_seed = 1234
     rng = numpy.random.RandomState(random_seed)
-
+    activation = "tanh"
 
 @ex.automain
 def my_main():
