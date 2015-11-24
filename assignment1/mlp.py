@@ -16,7 +16,7 @@ import theano.tensor as T
 
 import data_loader
 from logistic_layer import LogisticRegression
-from hidden_layer import HiddenLayer
+from hidden_layer import HiddenLayer, DropoutHiddenLayer, _dropout_from_layer
 import activations as act
 
 
@@ -31,7 +31,8 @@ class MLP(object):
     class).
     """
 
-    def __init__(self, rng, input, n_in, n_hidden, n_out, activations="tanh"):
+    def __init__(self, rng, input, n_in, n_hidden, n_out, activations="tanh",
+                 use_bias=True, dropout_rate=0):
         """Initialize the parameters for the multilayer perceptron
 
         :type rng: numpy.random.RandomState
@@ -55,35 +56,64 @@ class MLP(object):
         """
 
         # Since we are dealing with a one hidden layer MLP, this will translate
-        # into a HiddenLayer with a tanh activation function connected to the
+        # into a HiddenLayer connected to the
         # LogisticRegression layer; the activation function can be replaced by
         # sigmoid or any other nonlinear function
+        #
+        # For Dropout, we basically need to set up two different MLPs
+        # - one with dropout layers (used for training) and one for
+        # prediction. [Question -- can we get error bounds if we run
+        # forward propagation on the random dropout network a bunch of
+        # times?  Might these be calibrated probabilities? Probably not...
         activation = act.get_activation(activations)
-        self.hiddenLayer = HiddenLayer(rng=rng, input=input, n_in=n_in,
-                                       n_out=n_hidden, activation=activation)
 
-        # The logistic regression layer gets as input the hidden units
-        # of the hidden layer
-        self.logRegressionLayer = LogisticRegression(
-            input=self.hiddenLayer.output, n_in=n_hidden, n_out=n_out)
+        next_layer_input = input
+        next_dropout_layer_input = _dropout_from_layer(
+            rng, input, dropout_rate=dropout_rate)
 
-        self.L1 = (abs(self.hiddenLayer.W).sum()
-                   + abs(self.logRegressionLayer.W).sum())
+        next_dropout_layer = DropoutHiddenLayer(
+            rng=rng, input=next_dropout_layer_input,
+            n_in=n_in, n_out=n_out, activation=activation,
+            use_bias=use_bias, dropout_rate=dropout_rate)
 
-        self.L2_sqr = ((self.hiddenLayer.W ** 2).sum()
-                       + (self.logRegressionLayer.W ** 2).sum())
+        next_dropout_layer_input = next_dropout_layer.output
 
-        # negative log likelihood of the MLP
-        self.negative_log_likelihood = (
-            self.logRegressionLayer.negative_log_likelihood
-        )
-        # same holds for the function computing the number of errors
-        self.errors = self.logRegressionLayer.errors
+        # Reuse the parameters from the dropout layer here, in a different
+        # path through the graph.
+        next_layer = HiddenLayer(
+            rng=rng, input=next_layer_input,
+            activation=activation,
+            # scale the weight matrix W with probability of keeping
+            W=next_dropout_layer.W * (1 - dropout_rate),
+            b=next_dropout_layer.b,
+            n_in=n_in, n_out=n_out,
+            use_bias=use_bias)
 
-        # the parameters of the model are the parameters of the two layer it is
-        # made out of
-        self.params = self.hiddenLayer.params + self.logRegressionLayer.params
-        # end-snippet-3
+        next_layer.input = next_layer.output
+
+        # Now we set up the logistic regression (i.e. softmax) output
+        # layers for the dropout network and the regular network
+        self.dropout_output_layer = LogisticRegression(
+            input=next_dropout_layer_input, n_in=n_hidden, n_out=n_out)
+
+        self.output_layer = LogisticRegression(
+            input=next_layer_input, n_in=n_hidden, n_out=n_out,
+            W=self.dropout_output_layer.W * (1-dropout_rate),
+            b=self.dropout_output_layer.b)
+
+
+        # self.L1 = (abs(self.hiddenLayer.W).sum()
+        #            + abs(self.logRegressionLayer.W).sum())
+        # self.L2_sqr = ((self.hiddenLayer.W ** 2).sum()
+        #                + (self.logRegressionLayer.W ** 2).sum())
+
+        self.dropout_nll = self.dropout_output_layer.negative_log_likelihood
+        self.dropout_errors = self.dropout_output_layer.errors
+        self.nll = self.output_layer.negative_log_likelihood
+        self.errors = self.output_layer.errors
+
+        # The parameters for dropout and non-dropout are the same
+        self.params = self.output_layer.params + next_layer.params
 
         # keep track of model input
         self.input = input
@@ -92,7 +122,7 @@ class MLP(object):
 @ex.capture
 def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
              dataset='mnist.pkl.gz', batch_size=20, n_hidden=500,
-             activation="tanh",
+             activation="tanh", dropout=False, dropout_rate=0.5,
              rng=numpy.random.RandomState(1234)):
 
     datasets = data_loader.load_data(dataset)
@@ -115,7 +145,6 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     index = T.lscalar()  # index to a [mini]batch
     x = T.matrix('x')  # the data is presented as rasterized images
     y = T.ivector('y')  # the labels are presented as 1D vector of
-                        # 
 
     # construct the MLP class
     classifier = MLP(rng=rng, input=x, n_in=datasets["info"]["xdim"],
@@ -124,11 +153,11 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                      activations=activation)
 
     cost = (
-        classifier.negative_log_likelihood(y)
-        + L1_reg * classifier.L1
-        + L2_reg * classifier.L2_sqr
+        classifier.nll(y)
+        # + L1_reg * classifier.L1
+        # + L2_reg * classifier.L2_sqr
     )
-
+    dropout_cost = classifier.dropout_nll(y)
     # compiling a Theano function that computes the mistakes that are made
     # by the model on a minibatch
     test_model = theano.function(
@@ -151,8 +180,13 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
 
     # compute the gradient of cost with respect to theta (stored in params)
     # the resulting gradients will be stored in a list gparams
-    gparams = [T.grad(cost, param) for param in classifier.params]
-
+    gparams = []
+    for param in classifier.params:
+        # Use the right cost function here to train with or without dropout.
+        gparam = T.grad(dropout_cost if dropout else cost, param)
+        gparams.append(gparam)
+    # For use in theano.function, updates is a list,tuple,or dict
+    # that's iterable over pairs (shared_variable, new_expression)
     updates = [
         (param, param - learning_rate * gparam)
         for param, gparam in zip(classifier.params, gparams)
@@ -265,7 +299,7 @@ def my_config():
     datasetname = 'mnist.small.pkl.gz'
     #datasetname = 'mnist.pkl.gz'
     dataset = os.path.join(data_path, datasetname)
-    batch_size = 0
+    batch_size = 100
     n_hidden = 500
     theano_flags = "mode=FAST_RUN,device=gpu,floatX=float32"
     os.environ["THEANO_FLAGS"] = theano_flags

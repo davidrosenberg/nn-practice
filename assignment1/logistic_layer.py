@@ -5,28 +5,35 @@ import theano.tensor as T
 
 
 class LogisticRegression(object):
-    def __init__(self, input, n_in, n_out):
+    def __init__(self, input, n_in, n_out, W=None, b=None):
         """ Initialize the parameters of the logistic regression
         :type input: theano.tensor.TensorType
         """
         # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
-        self.W = theano.shared(
-            value=numpy.zeros(
-                (n_in, n_out),
-                dtype=theano.config.floatX
-            ),
-            name='W',
-            borrow=True
-        )
+        if W is None:
+            self.W = theano.shared(
+                value=numpy.zeros(
+                    (n_in, n_out),
+                    dtype=theano.config.floatX
+                ),
+                name='W',
+                borrow=True
+            )
+        else:
+            self.W = W
+
         # initialize the biases b as a vector of n_out 0s
-        self.b = theano.shared(
-            value=numpy.zeros(
-                (n_out,),
-                dtype=theano.config.floatX
-            ),
-            name='b',
-            borrow=True
-        )
+        if b is None:
+            self.b = theano.shared(
+                value=numpy.zeros(
+                    (n_out,),
+                    dtype=theano.config.floatX
+                ),
+                name='b',
+                borrow=True
+            )
+        else:
+            self.b = b
 
         self.p_y_given_x = T.nnet.softmax(T.dot(input, self.W) + self.b)
         self.y_pred = T.argmax(self.p_y_given_x, axis=1)

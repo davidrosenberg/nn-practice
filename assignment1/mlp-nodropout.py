@@ -1,6 +1,6 @@
 #!/usr/bin/python
 from sacred import Experiment
-ex = Experiment('MLP practice experiment')
+ex = Experiment('Multilayer Perceptron practice experiment')
 
 from sacred.observers import MongoObserver
 
@@ -14,48 +14,92 @@ import theano
 import theano.tensor as T
 
 
-from logistic_sgd import LogisticRegression, load_data
-from mlp import HiddenLayer, MLP, test_mlp
+import data_loader
+from logistic_layer import LogisticRegression
+from hidden_layer import HiddenLayer
+import activations as act
 
 
-def relu1(x):
-    return T.switch(x < 0, 0, x)
+class MLP(object):
+    """Multi-Layer Perceptron Class
 
-
-def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
-                dataset='mnist.pkl.gz', batch_size=20, n_hidden=500):
+    A multilayer perceptron is a feedforward artificial neural network model
+    that has one layer or more of hidden units and nonlinear activations.
+    Intermediate layers usually have as activation function tanh or the
+    sigmoid function (defined here by a ``HiddenLayer`` class)  while the
+    top layer is a softmax layer (defined here by a ``LogisticRegression``
+    class).
     """
-    Demonstrate stochastic gradient descent optimization for a multilayer
-    perceptron
 
-    This is demonstrated on MNIST.
+    def __init__(self, rng, input, n_in, n_hidden, n_out, activations="tanh"):
+        """Initialize the parameters for the multilayer perceptron
 
-    :type learning_rate: float
-    :param learning_rate: learning rate used (factor for the stochastic
-    gradient
+        :type rng: numpy.random.RandomState
+        :param rng: a random number generator used to initialize weights
 
-    :type L1_reg: float
-    :param L1_reg: L1-norm's weight when added to the cost (see
-    regularization)
+        :type input: theano.tensor.TensorType
+        :param input: symbolic variable that describes the input of the
+        architecture (one minibatch)
 
-    :type L2_reg: float
-    :param L2_reg: L2-norm's weight when added to the cost (see
-    regularization)
+        :type n_in: int
+        :param n_in: number of input units, the dimension of the space in
+        which the datapoints lie
 
-    :type n_epochs: int
-    :param n_epochs: maximal number of epochs to run the optimizer
+        :type n_hidden: int
+        :param n_hidden: number of hidden units
 
-    :type dataset: string
-    :param dataset: the path of the MNIST dataset file from
-                 http://www.iro.umontreal.ca/~lisa/deep/data/mnist/mnist.pkl.gz
+        :type n_out: int
+        :param n_out: number of output units, the dimension of the space in
+        which the labels lie
+
+        """
+
+        # Since we are dealing with a one hidden layer MLP, this will translate
+        # into a HiddenLayer with a tanh activation function connected to the
+        # LogisticRegression layer; the activation function can be replaced by
+        # sigmoid or any other nonlinear function
+        activation = act.get_activation(activations)
+        self.hiddenLayer = HiddenLayer(rng=rng, input=input, n_in=n_in,
+                                       n_out=n_hidden, activation=activation)
+
+        # The logistic regression layer gets as input the hidden units
+        # of the hidden layer
+        self.logRegressionLayer = LogisticRegression(
+            input=self.hiddenLayer.output, n_in=n_hidden, n_out=n_out)
+
+        self.L1 = (abs(self.hiddenLayer.W).sum()
+                   + abs(self.logRegressionLayer.W).sum())
+
+        self.L2_sqr = ((self.hiddenLayer.W ** 2).sum()
+                       + (self.logRegressionLayer.W ** 2).sum())
+
+        # negative log likelihood of the MLP
+        self.negative_log_likelihood = (
+            self.logRegressionLayer.negative_log_likelihood
+        )
+        # same holds for the function computing the number of errors
+        self.errors = self.logRegressionLayer.errors
+
+        # the parameters of the model are the parameters of the two layer it is
+        # made out of
+        self.params = self.hiddenLayer.params + self.logRegressionLayer.params
+        # end-snippet-3
+
+        # keep track of model input
+        self.input = input
 
 
-   """
-    datasets = load_data(dataset)
+@ex.capture
+def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
+             dataset='mnist.pkl.gz', batch_size=20, n_hidden=500,
+             activation="tanh",
+             rng=numpy.random.RandomState(1234)):
 
-    train_set_x, train_set_y = datasets[0]
-    valid_set_x, valid_set_y = datasets[1]
-    test_set_x, test_set_y = datasets[2]
+    datasets = data_loader.load_data(dataset)
+
+    train_set_x, train_set_y = datasets["data"][0]
+    valid_set_x, valid_set_y = datasets["data"][1]
+    test_set_x, test_set_y = datasets["data"][2]
 
     # compute number of minibatches for training, validation and testing
     n_train_batches = train_set_x.get_value(borrow=True).shape[0] / batch_size
@@ -71,31 +115,19 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     index = T.lscalar()  # index to a [mini]batch
     x = T.matrix('x')  # the data is presented as rasterized images
     y = T.ivector('y')  # the labels are presented as 1D vector of
-                        # [int] labels
-
-    rng = numpy.random.RandomState(1234)
+                        # 
 
     # construct the MLP class
-    classifier = MLP(
-        rng=rng,
-        input=x,
-#        n_in=28 * 28,
-        n_in=14 * 14,
-        n_hidden=n_hidden,
-        n_out=10,
-        activation=relu1
-    )
+    classifier = MLP(rng=rng, input=x, n_in=datasets["info"]["xdim"],
+                     n_hidden=n_hidden,
+                     n_out=datasets["info"]["y_num_categories"],
+                     activations=activation)
 
-    # start-snippet-4
-    # the cost we minimize during training is the negative log likelihood of
-    # the model plus the regularization terms (L1 and L2); cost is expressed
-    # here symbolically
     cost = (
         classifier.negative_log_likelihood(y)
         + L1_reg * classifier.L1
         + L2_reg * classifier.L2_sqr
     )
-    # end-snippet-4
 
     # compiling a Theano function that computes the mistakes that are made
     # by the model on a minibatch
@@ -117,25 +149,17 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
         }
     )
 
-    # start-snippet-5
-    # compute the gradient of cost with respect to theta (sotred in params)
+    # compute the gradient of cost with respect to theta (stored in params)
     # the resulting gradients will be stored in a list gparams
     gparams = [T.grad(cost, param) for param in classifier.params]
 
-    # specify how to update the parameters of the model as a list of
-    # (variable, update expression) pairs
-
-    # given two lists of the same length, A = [a1, a2, a3, a4] and
-    # B = [b1, b2, b3, b4], zip generates a list C of same size, where each
-    # element is a pair formed from the two lists :
-    #    C = [(a1, b1), (a2, b2), (a3, b3), (a4, b4)]
     updates = [
         (param, param - learning_rate * gparam)
         for param, gparam in zip(classifier.params, gparams)
     ]
 
     # compiling a Theano function `train_model` that returns the cost, but
-    # in the same time updates the parameter of the model based on the rules
+    # at the same time updates the parameters of the model based on the rules
     # defined in `updates`
     train_model = theano.function(
         inputs=[index],
@@ -146,7 +170,6 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
             y: train_set_y[index * batch_size: (index + 1) * batch_size]
         }
     )
-    # end-snippet-5
 
     ###############
     # TRAIN MODEL #
@@ -154,7 +177,7 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     print '... training'
 
     # early-stopping parameters
-    patience = 10000  # look as this many examples regardless
+    patience = 10000  # look at this many examples regardless
     patience_increase = 2  # wait this much longer when a new best is
                            # found
     improvement_threshold = 0.995  # a relative improvement of this much is
@@ -224,13 +247,34 @@ def my_test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                 break
 
     end_time = timeit.default_timer()
+
+    # Store experiment information
+    ex.info["run_time"] = end_time - start_time
+    ex.info["validation_perf"] = best_validation_loss * 100
+    ex.info["num_epochs"] = epoch
     print(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
-    print >> sys.stderr, ('The code for file ' +
-                          os.path.split(__file__)[1] +
-                          ' ran for %.2fm' % ((end_time - start_time) / 60.))
 
-if __name__ == '__main__':
+
+@ex.config
+def my_config():
+    learning_rate = 0.01
+    n_epochs = 25
     data_path = "/home/drosen/repos/DeepLearningTutorials/data"
-    my_test_mlp(dataset=os.path.join(data_path, 'mnist.small.pkl.gz'))
+    datasetname = 'mnist.small.pkl.gz'
+    #datasetname = 'mnist.pkl.gz'
+    dataset = os.path.join(data_path, datasetname)
+    batch_size = 100
+    n_hidden = 500
+    theano_flags = "mode=FAST_RUN,device=gpu,floatX=float32"
+    os.environ["THEANO_FLAGS"] = theano_flags
+    db_name = "MY_DB"
+    ex.observers.append(MongoObserver.create(db_name=db_name))
+    random_seed = 1234
+    rng = numpy.random.RandomState(random_seed)
+    activation = "tanh"
+
+@ex.automain
+def my_main():
+    test_mlp()

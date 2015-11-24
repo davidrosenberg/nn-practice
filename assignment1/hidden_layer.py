@@ -30,7 +30,6 @@ class HiddenLayer(object):
                            layer
         """
         self.input = input
-        # end-snippet-1
 
         # `W` is initialized with `W_values` which is uniformely sampled
         # from sqrt(-6./(n_in+n_hidden)) and sqrt(6./(n_in+n_hidden))
@@ -42,8 +41,6 @@ class HiddenLayer(object):
         #        For example, results presented in [Xavier10] suggest that you
         #        should use 4 times larger initial weights for sigmoid
         #        compared to tanh
-        #        We have no info for other function, so we use the same as
-        #        tanh.
         if W is None:
             if activation == act.relu1 or activation == act.ReLU:
                 # Following He et al. (Delving Deep Into Rectifiers paper)
@@ -84,3 +81,31 @@ class HiddenLayer(object):
             lin_output if activation is None
             else activation(lin_output)
         )
+
+
+def _dropout_from_layer(rng, layer, dropout_rate):
+    """dropout_rate is the probablity of dropping a unit. Need to create a
+    shared random stream... It's like a random variable in the graph
+    http://deeplearning.net/software/theano/library/tensor/shared_randomstreams.html
+    I don't actually understand this yet.
+
+    """
+    srng = theano.tensor.shared_randomstreams.RandomStreams(
+        rng.randint(999999))
+    # p=1-dropout_rate because 1's indicate keep and p is prob of dropping
+    mask = srng.binomial(n=1, p=1-dropout_rate, size=layer.shape)
+    # The cast is important because
+    # int * float32 = float64 which pulls things off the gpu
+    output = layer * T.cast(mask, theano.config.floatX)
+    return output
+
+
+class DropoutHiddenLayer(HiddenLayer):
+    def __init__(self, rng, input, n_in, n_out,
+                 activation, use_bias, dropout_rate, W=None, b=None):
+        super(DropoutHiddenLayer, self).__init__(
+            rng=rng, input=input, n_in=n_in, n_out=n_out, W=W, b=b,
+            activation=activation, use_bias=use_bias)
+
+        self.output = _dropout_from_layer(rng, self.output,
+                                          dropout_rate=dropout_rate)
