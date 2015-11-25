@@ -183,13 +183,18 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     gparams = []
     for param in classifier.params:
         # Use the right cost function here to train with or without dropout.
+        print dropout
+        print param
+#        theano.printing.pydotprint(cost)
+        
         gparam = T.grad(dropout_cost if dropout else cost, param)
         gparams.append(gparam)
+
     # For use in theano.function, updates is a list,tuple,or dict
     # that's iterable over pairs (shared_variable, new_expression)
     updates = [
-        (param, param - learning_rate * gparam)
-        for param, gparam in zip(classifier.params, gparams)
+        (param, param - learning_rate * gp)
+        for param, gp in zip(classifier.params, gparams)
     ]
 
     # compiling a Theano function `train_model` that returns the cost, but
@@ -211,16 +216,15 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     print '... training'
 
     # early-stopping parameters
-    patience = 10000  # look at this many examples regardless
-    patience_increase = 2  # wait this much longer when a new best is
-                           # found
-    improvement_threshold = 0.995  # a relative improvement of this much is
-                                   # considered significant
+    # look at this many examples regardless
+    patience = 10000  
+    # wait this much longer when a new best is found
+    patience_increase = 2
+    # a relative improvement of this much is considered significant
+    improvement_threshold = 0.995
+    # go thru this many minibatches before checking the network on
+    # the validation set (or once per epoch, whichever is smaller)
     validation_frequency = min(n_train_batches, patience / 2)
-                                  # go through this many
-                                  # minibatches before checking the network
-                                  # on the validation set; in this case we
-                                  # check every epoch
 
     best_validation_loss = numpy.inf
     best_iter = 0
@@ -308,6 +312,8 @@ def my_config():
     random_seed = 1234
     rng = numpy.random.RandomState(random_seed)
     activation = "tanh"
+    dropout=False
+    dropout_rate=0.5,
 
 @ex.automain
 def my_main():
