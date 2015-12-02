@@ -65,15 +65,22 @@ class HiddenLayer(object):
             W = theano.shared(value=W_values, name='W', borrow=True)
 
         self.W = W
+        
+        # Seems weird to deal with b at all even if we don't want to
+        # include a bias term.  This is for convenience, so that when
+        # we do parameter sharing, we don't have to have a special
+        # check for whether or not we're using bias.  We won't
+        # actually use the self.b parameter because we're not
+        # including it into the parameter list self.params.
+        if b is None:
+            b_values = numpy.zeros((n_out,), dtype=theano.config.floatX)
+            b = theano.shared(value=b_values, name='b', borrow=True)
+        self.b = b
 
         if not use_bias:
             self.params = [self.W]
             lin_output = T.dot(input, self.W)
         else:
-            if b is None:
-                b_values = numpy.zeros((n_out,), dtype=theano.config.floatX)
-                b = theano.shared(value=b_values, name='b', borrow=True)
-            self.b = b
             self.params = [self.W, self.b]
             lin_output = T.dot(input, self.W) + self.b
 
@@ -103,6 +110,7 @@ def _dropout_from_layer(rng, layer, dropout_rate):
 class DropoutHiddenLayer(HiddenLayer):
     def __init__(self, rng, input, n_in, n_out,
                  activation, use_bias, dropout_rate, W=None, b=None):
+        print "Constructing DropoutHiddenLayer with dropout_rate =",dropout_rate
         super(DropoutHiddenLayer, self).__init__(
             rng=rng, input=input, n_in=n_in, n_out=n_out, W=W, b=b,
             activation=activation, use_bias=use_bias)

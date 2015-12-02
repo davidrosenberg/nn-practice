@@ -5,7 +5,6 @@ ex = Experiment('Multilayer Perceptron practice experiment')
 from sacred.observers import MongoObserver
 
 import os
-import sys
 import timeit
 
 import numpy
@@ -17,6 +16,9 @@ import theano.tensor as T
 import data_loader
 from logistic_layer import LogisticRegression
 from hidden_layer import HiddenLayer, DropoutHiddenLayer, _dropout_from_layer
+# import misc
+# from theano.compile.sharedvalue import SharedVariable, shared
+
 import activations as act
 
 
@@ -32,7 +34,7 @@ class MLP(object):
     """
 
     def __init__(self, rng, input, n_in, n_hidden, n_out, activations="tanh",
-                 use_bias=True, dropout_rate=0):
+                 use_bias=True, dropout=False, dropout_rate=0):
         """Initialize the parameters for the multilayer perceptron
 
         :type rng: numpy.random.RandomState
@@ -65,6 +67,11 @@ class MLP(object):
         # prediction. [Question -- can we get error bounds if we run
         # forward propagation on the random dropout network a bunch of
         # times?  Might these be calibrated probabilities? Probably not...
+
+        # Not sure if this is necessary -- but just in case for now.
+        if not dropout:
+            dropout_rate = 0
+
         activation = act.get_activation(activations)
 
         next_layer_input = input
@@ -73,23 +80,24 @@ class MLP(object):
 
         next_dropout_layer = DropoutHiddenLayer(
             rng=rng, input=next_dropout_layer_input,
-            n_in=n_in, n_out=n_out, activation=activation,
+            n_in=n_in, n_out=n_hidden, activation=activation,
             use_bias=use_bias, dropout_rate=dropout_rate)
 
         next_dropout_layer_input = next_dropout_layer.output
 
         # Reuse the parameters from the dropout layer here, in a different
         # path through the graph.
+        # [Could be a constructor that takes a dropout hidden layer.]
         next_layer = HiddenLayer(
             rng=rng, input=next_layer_input,
             activation=activation,
             # scale the weight matrix W with probability of keeping
             W=next_dropout_layer.W * (1 - dropout_rate),
             b=next_dropout_layer.b,
-            n_in=n_in, n_out=n_out,
+            n_in=n_in, n_out=n_hidden,
             use_bias=use_bias)
 
-        next_layer.input = next_layer.output
+        next_layer_input = next_layer.output
 
         # Now we set up the logistic regression (i.e. softmax) output
         # layers for the dropout network and the regular network
@@ -101,7 +109,6 @@ class MLP(object):
             W=self.dropout_output_layer.W * (1-dropout_rate),
             b=self.dropout_output_layer.b)
 
-
         # self.L1 = (abs(self.hiddenLayer.W).sum()
         #            + abs(self.logRegressionLayer.W).sum())
         # self.L2_sqr = ((self.hiddenLayer.W ** 2).sum()
@@ -112,8 +119,11 @@ class MLP(object):
         self.nll = self.output_layer.negative_log_likelihood
         self.errors = self.output_layer.errors
 
-        # The parameters for dropout and non-dropout are the same
-        self.params = self.output_layer.params + next_layer.params
+        # The parameters for dropout and non-dropout are the same, but
+        # we need to add the ones in the dropout layers, because those
+        # are the shared variables... the ones in next_layer are
+        # derived versions.
+        self.params = self.dropout_output_layer.params + next_dropout_layer.params
 
         # keep track of model input
         self.input = input
@@ -123,6 +133,7 @@ class MLP(object):
 def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
              dataset='mnist.pkl.gz', batch_size=20, n_hidden=500,
              activation="tanh", dropout=False, dropout_rate=0.5,
+             use_bias=True,
              rng=numpy.random.RandomState(1234)):
 
     datasets = data_loader.load_data(dataset)
@@ -150,7 +161,10 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     classifier = MLP(rng=rng, input=x, n_in=datasets["info"]["xdim"],
                      n_hidden=n_hidden,
                      n_out=datasets["info"]["y_num_categories"],
-                     activations=activation)
+                     activations=activation,
+                     use_bias=use_bias,
+                     dropout=dropout,
+                     dropout_rate=dropout_rate)
 
     cost = (
         classifier.nll(y)
@@ -181,12 +195,11 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     # compute the gradient of cost with respect to theta (stored in params)
     # the resulting gradients will be stored in a list gparams
     gparams = []
+
+    print "\nNow computing partial derivative w.r.t. each parameter:"
+
     for param in classifier.params:
         # Use the right cost function here to train with or without dropout.
-        print dropout
-        print param
-#        theano.printing.pydotprint(cost)
-        
         gparam = T.grad(dropout_cost if dropout else cost, param)
         gparams.append(gparam)
 
@@ -312,8 +325,9 @@ def my_config():
     random_seed = 1234
     rng = numpy.random.RandomState(random_seed)
     activation = "tanh"
-    dropout=False
-    dropout_rate=0.5,
+    dropout=True
+    dropout_rate=0.5
+    use_bias=False
 
 @ex.automain
 def my_main():
