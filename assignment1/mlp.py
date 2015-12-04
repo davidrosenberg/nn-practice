@@ -302,7 +302,10 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     # Store experiment information
     ex.info["run_time"] = end_time - start_time
     ex.info["validation_perf"] = best_validation_loss * 100
+    ex.info["test_perf"] = test_score * 100
     ex.info["num_epochs"] = epoch
+    ex.info["num_steps"] = iter
+    ex.info["best_iter"] = best_iter
     print(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
@@ -318,6 +321,7 @@ def my_config():
     dataset = os.path.join(data_path, datasetname)
     batch_size = 100
     n_hidden = 500
+    
     theano_flags = "mode=FAST_RUN,device=gpu,floatX=float32"
     os.environ["THEANO_FLAGS"] = theano_flags
     db_name = "MY_DB"

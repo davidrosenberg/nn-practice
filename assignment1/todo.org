@@ -1,0 +1,12 @@
+* <2015-11-19 Thu>
+- [ ] Work on eval.py script... collecting and looking at the results
+- [ ] Compare performance (number of epochs?) with & without dropout
+- [ ] make multilayer version of dropout
+- [ ] compare perf of 1,2,3 hidden layers - experiment with depth, width, activation, regularization; find optimal config for fixed number of total weights
+
+* Other ideas
+- [ ] check if we run feedforward through randomly selected dropout
+  network a bunch of times if we get sensible probabilities for class
+  labels (or score distributions?)
+- [ ] Compare ReLU to Tanh in terms of performance, runtime, and convergence speed on the smaller data
+- [ ] Make a class called Training_Evaluator that we call after every minibatch and it decides whether to evalaute the model; intialized with all the patience crap. keeps track of the best scores, etc.  And it's queryable. or Traing_Tracker. All the annoying parameters can be extracted
