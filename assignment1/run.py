@@ -5,23 +5,19 @@ from sklearn.grid_search import ParameterGrid
 
 configs = []
 configs.append({"learning_rate": 0.10, "n_epochs": 5})
-configs.append({"learning_rate": 0.15, "n_epochs": 5})
-configs.append({"learning_rate": 0.10, "n_epochs": 5})
-configs.append({"learning_rate": 0.15, "n_epochs": 5})
-configs.append({"learning_rate": 0.20, "n_epochs": 5})
-configs.append({"learning_rate": 0.10, "n_epochs": 5})
 
 # Here we'll setup a classic grid search
-num_epochs_batchsizeone = 1
+num_epochs_batchsizeone = .1
 grid_params = {}
-grid_params["dropout_rate"] = [0, .5]
-grid_params["batch_size"] = [10]
+grid_params["dropout_rate"] = [0]#[0, .5]
+grid_params["batch_size"] = [100]
 grid_params["activation"] = ["relu", "tanh"]
 configs = list(ParameterGrid(grid_params))
 for i, v in enumerate(configs):
     v["n_epochs"] = v["batch_size"] * num_epochs_batchsizeone
 
 use_gpus = False
+use_gpus = True
 num_gpus = 6
 
 base_flags = "THEANO_FLAGS=mode=FAST_RUN,floatX=float32"

@@ -1,3 +1,7 @@
+* <2015-12-24 Thu>
+- [ ] Finish figuring out how to serialize the learning_table to MongoDB
+- [ ] Finish setting up my R framework for extracting results from MongoDB and plotting them
+
 * <2015-11-19 Thu>
 - [ ] Work on eval.py script... collecting and looking at the results
 - [ ] Compare performance (number of epochs?) with & without dropout
@@ -10,3 +14,21 @@
   labels (or score distributions?)
 - [ ] Compare ReLU to Tanh in terms of performance, runtime, and convergence speed on the smaller data
 - [ ] Make a class called Training_Evaluator that we call after every minibatch and it decides whether to evalaute the model; intialized with all the patience crap. keeps track of the best scores, etc.  And it's queryable. or Traing_Tracker. All the annoying parameters can be extracted
+
+
+* NOTES on install
+export HTTP_PROXY=http://proxy.bloomberg.com:81
+export HTTPS_PROXY=http://proxy.bloomberg.com:81
+export {http,https,ftp}_proxy='http://proxy.bloomberg.com:81'
+pip install --proxy="http://proxy.bloomberg.com:81"
+
+sudo -E pip install --proxy http://proxy.bloomberg.com:81 wrapt
+
+* Getting keyserver without proxy
+The hkp protocol can't be easily proxied - but you can use curl to look it up - such as:
+
+http://keyserver.ubuntu.com/pks/lookup?op=vindex&search=0xE084DAB9
+
+The short fragment (e.g. 0xE084DAB9) will yield the link which you can give to curl:
+
+$ curl -x $HTTP_PROXY 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x51716619E084DAB9' | sudo apt-key add -

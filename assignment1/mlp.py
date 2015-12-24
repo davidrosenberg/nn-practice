@@ -6,7 +6,7 @@ from sacred.observers import MongoObserver
 
 import os
 import timeit
-
+import pandas as pd
 import numpy
 
 import theano
@@ -239,6 +239,10 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     # the validation set (or once per epoch, whichever is smaller)
     validation_frequency = min(n_train_batches, patience / 2)
 
+    learning_table_cols = ['epoch','step','seconds','validation_loss']
+    learning_table = pd.DataFrame(columns=learning_table_cols)
+
+
     best_validation_loss = numpy.inf
     best_iter = 0
     test_score = 0.
@@ -260,6 +264,11 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
                 validation_losses = [validate_model(i) for i
                                      in xrange(n_valid_batches)]
                 this_validation_loss = numpy.mean(validation_losses)
+                # learning_table_cols = ['epoch','step','seconds','validation_loss']
+                newRow = pd.DataFrame(
+                    [[epoch,iter, timeit.default_timer()-start_time,
+                      this_validation_loss]],columns=learning_table_cols)
+                learning_table = learning_table.append(newRow,  ignore_index=True)
 
                 print(
                     'epoch %i, minibatch %i/%i, validation error %f %%' %
@@ -300,12 +309,12 @@ def test_mlp(learning_rate=0.01, L1_reg=0.00, L2_reg=0.0001, n_epochs=1000,
     end_time = timeit.default_timer()
 
     # Store experiment information
+    ex.info["best_iter"] = best_iter
+    ex.info["learning_table"] = learning_table.to_dict()
     ex.info["run_time"] = end_time - start_time
     ex.info["validation_perf"] = best_validation_loss * 100
     ex.info["test_perf"] = test_score * 100
-    ex.info["num_epochs"] = epoch
     ex.info["num_steps"] = iter
-    ex.info["best_iter"] = best_iter
     print(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))

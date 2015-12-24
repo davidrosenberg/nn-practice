@@ -1,3 +1,4 @@
+import numpy as np
 import datetime
 import pymongo
 from bson import json_util
@@ -32,13 +33,33 @@ def get_results(filt, project=None):
 filt = {'config.datasetname': 'mnist.small.pkl.gz', 'status': 'COMPLETED'}
 dd = pd.io.json.json_normalize(runs.find(filt))
 
-d = dd[dd.stop_time > "2015-12-03"]
+dd = dd[dd.stop_time > "2015-12-03"]
 
-colsToKeep = ['config.activation', 'config.batch_size','config.dropout_rate',
-              'config.learning_rate', 'config.n_epochs', 'config.n_hidden',
-              'info.num_epochs', 'info.run_time', 'info.validation_perf']
+colsToKeep = ['config.activation',
+              'config.batch_size','config.dropout_rate',
+              'config.learning_rate', 'config.n_epochs',
+              'info.num_steps','config.n_hidden', 'info.num_epochs',
+              'info.run_time', 'info.validation_perf',
+              'info.test_perf','info.learning_curve']
 
-d[colsToKeep]
+d = dd[colsToKeep]
+d[pd.notnull(d['info.learning_curve'])]
 
-df = pd.DataFrame(results)
+tp = d[['
+
+ldf = pd.DataFrame(results)
 df = pd.DataFrame(list(db.default.runs.find()))
+
+from ggplot import *
+meat_lng = pd.melt(meat[['date', 'beef', 'pork', 'broilers']], id_vars='date')
+ggplot(aes(x='date', y='value', colour='variable'), data=meat_lng) + \
+    geom_point() + \
+    stat_smooth(color='red')
+
+ggplot(aes(x='date', y='beef'), data=meat) + \
+    geom_point(color='lightblue') + \
+    stat_smooth(span=.15, color='black', se=True) + \
+    ggtitle("Beef: It's What's for Dinner") + \
+    xlab("Date") + \
+    ylab("Head of Cattle Slaughtered")
+
